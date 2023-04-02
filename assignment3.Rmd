@@ -1,0 +1,517 @@
+---
+title: "IHSD 7440 Assignment 3"
+author: "Michaela Proffitt"
+date: "2023-03-24"
+output: 
+  html_notebook: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+
+```{r preamble, warning= FALSE}
+#----------------------------------------------------------------------------#
+#                                                                            #
+# Assignment 3 script     #
+#                                                                            #
+#   Michaela Proffitt March 24th 2023  mproffitt@tulane.edu                            #
+#                                                                            #
+#    This script is a demonstration of the basic principles of               #
+#    developing a literate program as well as some basics of conducting      #
+#    descriptive statistics on select DHS data using correct sampling        #
+#    weights and and analytical approaches                                   #
+#                                                                            #
+#                                                                            #
+#----------------------------------------------------------------------------#
+
+# loading required libraries ----
+library(tidyverse)
+library(haven)
+library(formatR)
+library(Hmisc)
+#install.packages("survey") 
+library(survey)
+#install.packages("srvyr")
+#library(srvyr)
+#install.packages("weights")
+library(weights)
+#set any other options ----
+
+```
+
+## Compile date and session info
+
+```{r docinfo, echo = FALSE, warning= FALSE}
+
+# print and get runtime ----
+date()
+
+# session info ----
+sessionInfo()
+
+```
+## Step 1: Import and investigate both datasets
+
+```{r load, tidy = TRUE}
+
+
+
+zam_child <- read.csv(file = "C:\\Users\\Mikki\\OneDrive - Tulane University\\Documents\\sampling\\GitHub\\IHSD_7440_HH_Sampling\\2007_Zambia_Child_2023.csv")
+zam_hh <- read.csv(file = "C:\\Users\\Mikki\\OneDrive - Tulane University\\Documents\\sampling\\GitHub\\IHSD_7440_HH_Sampling\\2007_Zambia_HH_2023.csv")
+
+# View data set in new window'
+View(zam_child)
+View(zam_hh)
+
+```
+
+
+```{r elements2}
+describe(zam_hh)
+```
+```{r elements}
+describe(zam_child)
+```
+Now to rename variables
+
+```{r mames1}
+names(zam_hh)
+names(zam_hh)[names(zam_hh) == "HV022"] <- "Sample_stratum_number"
+names(zam_hh)[names(zam_hh) == "HV023"] <- "Sample_domain"
+names(zam_hh)[names(zam_hh) == "HV002"] <- "Household_number"
+names(zam_hh)[names(zam_hh) == "HV005"] <- "Sample_weight"
+names(zam_hh)[names(zam_hh) == "HV009"] <- "Number_HH_members"
+names(zam_hh)[names(zam_hh) == "HV014"] <- "Number_children_5_under"
+names(zam_hh)[names(zam_hh) == "HV021"] <- "Primary_sampling_unit"
+names(zam_hh)[names(zam_hh) == "HV206"] <- "Has_electricity"
+names(zam_hh)[names(zam_hh) == "HML1"]  <- "Number_ITNs"
+names(zam_hh)[names(zam_hh) == "HV237"] <- "Water_treated"
+names(zam_hh)[names(zam_hh) == "SH125A"] <- "IRS"
+names(zam_hh)[names(zam_hh) == "HV237B"] <- "Water_treated_blch_chlr"
+names(zam_hh)
+
+describe(zam_hh)
+```
+```{r mames}
+names(zam_child)
+names(zam_child)[names(zam_child) == "V022"] <- "Sample_stratum_number"
+names(zam_child)[names(zam_child) == "V023"] <- "Sample_domain"
+names(zam_child)[names(zam_child) == "V002"] <- "Household_number"
+names(zam_child)[names(zam_child) == "V005"] <- "Sample_weight"
+names(zam_child)[names(zam_child) == "V009"] <- "Number_HH_members"
+names(zam_child)[names(zam_child) == "V014"] <- "Number_children_5_under"
+names(zam_child)[names(zam_child) == "V021"] <- "Primary_sampling_unit"
+names(zam_child)[names(zam_child) == "V206"] <- "Has_electricity"
+names(zam_child)[names(zam_child) == "ML1"]  <- "Number_ITNs"
+names(zam_child)[names(zam_child) == "V237"] <- "Water_treated"
+names(zam_child)[names(zam_child) == "H125A"] <- "IRS"
+names(zam_child)[names(zam_child) == "V237B"] <- "Water_treated_blch_chlr"
+names(zam_child)
+
+```
+
+
+```{r clusters2}
+length(unique(zam_hh$Primary_sampling_unit)) 
+# this line of code will return the number of unique observations (i.e number of clusters) within your primary sampling unit variable (remember clusters are our PSU here)
+# ```
+```
+
+```{r clusters3}
+length(unique(zam_child$Primary_sampling_unit)) 
+
+```
+
+3.) How many survey domains are there in this data set? 
+
+```{r domains2}
+length(unique(zam_hh$Sample_domain)) 
+
+range=as.data.frame(table(zam_hh$Primary_sampling_unit))
+min(range$Freq)
+max(range$Freq)
+```
+
+## Step 2: Calculate proportions and standard errors for select indicators assuming SRS without weights
+
+
+```{r set weight}
+
+zam_hh$pw<- zam_hh$Sample_weight/1000000 #Here we are creating a new variable "pw" in our primary data set that corresponds with the calculated weight
+
+zam_child$pw<- zam_child$Sample_weight/1000000 #Here we are creating a new variable "pw" in our primary data set that corresponds with the calculated weight
+
+```
+
+
+
+```{r SRS res, warning = FALSE, message = FALSE}
+
+Urban.ITN <- subset(zam_hh, subset=(HH_residence=="Urban"))#creates subset featuring only HHs in urban areas
+attach(Urban.ITN)
+
+Rural.ITN <- subset(zam_hh, subset=(HH_residence=="Rural")) #creates subset featuring only HHs in rural areas
+attach(Rural.ITN)# make objects in data frames accessible (rural subset) without actually typing the name of the data frame
+
+#Now we want to calculate the proportion (and standard error) of HHs in urban areas that have ITNs:
+
+mean.urban <- mean(Urban.ITN$HH_has_ITN)
+mean.urban 
+se.urban <-sqrt(var(Urban.ITN$HH_has_ITN,na.rm=TRUE)/length(na.omit(Urban.ITN$HH_has_ITN)))
+se.urban
+
+mean.rural <- mean(Rural.ITN$HH_has_ITN)
+mean.rural 
+se.rural <-sqrt(var(Rural.ITN$HH_has_ITN,na.rm=TRUE)/length(na.omit(Rural.ITN$HH_has_ITN)))
+se.rural
+```
+
+``` {r SRS edu, warning = FALSE, message = FALSE}
+#2) Education level
+
+#Using subset approach (means and standard errors) for each category/value under the HH_edu variable
+Noedu.ITN <- subset(zam_hh, subset=(HH_head_education=="No education"))
+attach(Noedu.ITN)
+Primary.ITN <- subset(zam_hh, subset=(HH_head_education=="Primary"))
+attach(Primary.ITN)
+Secondary.ITN <- subset(zam_hh, subset=(HH_head_education=="Secondary"))
+attach(Secondary.ITN)
+Higher.ITN <- subset(zam_hh, subset=(HH_head_education=="Higher than"))
+attach(Higher.ITN)
+
+mean.none <- mean(Noedu.ITN$HH_has_ITN) #No education
+mean.none
+se.none <-sqrt(var(Noedu.ITN$HH_has_ITN,na.rm=TRUE)/length(na.omit(Noedu.ITN$HH_has_ITN)))
+se.none
+mean.primary<- mean(Primary.ITN$HH_has_ITN)#Primary
+mean.primary
+se.primary <-sqrt(var(Primary.ITN$HH_has_ITN,na.rm=TRUE)/length(na.omit(Primary.ITN$HH_has_ITN)))
+se.primary
+mean.secondary<- mean(Secondary.ITN$HH_has_ITN)#Secondary
+mean.secondary
+se.secondary <-sqrt(var(Secondary.ITN$HH_has_ITN,na.rm=TRUE)/length(na.omit(Secondary.ITN$HH_has_ITN)))
+se.secondary
+mean.higher <- mean(Higher.ITN$HH_has_ITN)#Higher than
+mean.higher
+se.higher <-sqrt(var(Higher.ITN$HH_has_ITN,na.rm=TRUE)/length(na.omit(Higher.ITN$HH_has_ITN)))
+se.higher
+```
+
+``` {r SRS edu2, warning = FALSE, message = FALSE}
+#2) SES
+
+poorest.ITN <- subset(zam_hh, subset=(HH_wealth_index=="Lowest"))
+attach(poorest.ITN)
+poorer.ITN <- subset(zam_hh, subset=(HH_wealth_index=="Second"))
+attach(poorer.ITN)
+middle.ITN <- subset(zam_hh, subset=(HH_wealth_index=="Middle"))
+attach(middle.ITN)
+richer.ITN <- subset(zam_hh, subset=(HH_wealth_index=="Fourth"))
+attach(richer.ITN)
+richest.ITN <- subset(zam_hh, subset=(HH_wealth_index=="Highes"))
+attach(richest.ITN)
+
+mean.poorest <- mean(poorest.ITN$HH_has_ITN) #No education
+mean.none
+se.poorest <-sqrt(var(poorest.ITN$HH_has_ITN,na.rm=TRUE)/length(na.omit(poorest.ITN$HH_has_ITN)))
+se.poorest
+mean.poorer<- mean(poorer.ITN$HH_has_ITN)#Primary
+mean.poorer
+se.poorer <-sqrt(var(poorer.ITN$HH_has_ITN,na.rm=TRUE)/length(na.omit(poorer.ITN$HH_has_ITN)))
+se.poorer
+mean.middle<- mean(middle.ITN$HH_has_ITN)#Secondary
+mean.middle
+se.middle <-sqrt(var(middle.ITN$HH_has_ITN,na.rm=TRUE)/length(na.omit(middle.ITN$HH_has_ITN)))
+se.middle
+mean.richer <- mean(richer.ITN$HH_has_ITN)#Higher than
+mean.richer
+se.richer <-sqrt(var(richer.ITN$HH_has_ITN,na.rm=TRUE)/length(na.omit(richer.ITN$HH_has_ITN)))
+se.richer
+mean.richest <- mean(richest.ITN$HH_has_ITN)#Higher than
+mean.richest
+se.richest <-sqrt(var(richest.ITN$HH_has_ITN,na.rm=TRUE)/length(na.omit(richest.ITN$HH_has_ITN)))
+se.richest
+
+mean(zam_hh$HH_has_ITN)
+sqrt(var(zam_hh$HH_has_ITN,na.rm=TRUE)/length(na.omit(zam_hh$HH_has_ITN)))
+```
+```{r SRS res3, warning = FALSE, message = FALSE}
+
+Urbanchild.ITN <- subset(zam_child, subset=(HH_residence=="Urban"))
+attach(Urbanchild.ITN)
+
+Ruralchild.ITN <- subset(zam_child, subset=(HH_residence=="Rural")) 
+attach(Ruralchild.ITN)
+
+#Now we want to calculate the proportion (and standard error) of HHs in urban areas that have ITNs:
+
+mean.urbanchild <- mean(Urbanchild.ITN$Slept_ITN)
+mean.urbanchild 
+se.urbanchild <-sqrt(var(Urbanchild.ITN$Slept_ITN,na.rm=TRUE)/length(na.omit(Urbanchild.ITN$Slept_ITN)))
+se.urbanchild
+
+#And in rural areas
+mean.ruralchild <- mean(Ruralchild.ITN$Slept_ITN)
+mean.ruralchild #prints results
+se.ruralchild <-sqrt(var(Ruralchild.ITN$Slept_ITN,na.rm=TRUE)/length(na.omit(Ruralchild.ITN$Slept_ITN)))#calculates standard error
+se.ruralchild# prints results
+```
+```{r SRS edu3, warning = FALSE, message = FALSE}
+poorestchild.ITN <- subset(zam_child, subset=(HH_wealth_index=="Lowest"))
+attach(poorestchild.ITN)
+poorerchild.ITN <- subset(zam_child, subset=(HH_wealth_index=="Second"))
+attach(poorerchild.ITN)
+middlechild.ITN <- subset(zam_child, subset=(HH_wealth_index=="Middle"))
+attach(middlechild.ITN)
+richerchild.ITN <- subset(zam_child, subset=(HH_wealth_index=="Fourth"))
+attach(richerchild.ITN)
+richestchild.ITN <- subset(zam_child, subset=(HH_wealth_index=="Highes"))
+attach(richestchild.ITN)
+
+mean.poorestchild <- mean(poorestchild.ITN$Slept_ITN) 
+mean.poorestchild
+se.poorestchild <-sqrt(var(poorestchild.ITN$Slept_ITN,na.rm=TRUE)/length(na.omit(poorestchild.ITN$Slept_ITN)))
+se.poorestchild
+mean.poorerchild<- mean(poorerchild.ITN$Slept_ITN)
+mean.poorerchild
+se.poorerchild <-sqrt(var(poorerchild.ITN$Slept_ITN,na.rm=TRUE)/length(na.omit(poorerchild.ITN$Slept_ITN)))
+se.poorerchild
+mean.middlechild<- mean(middlechild.ITN$Slept_ITN)
+mean.middlechild
+se.middlechild <-sqrt(var(middlechild.ITN$Slept_ITN,na.rm=TRUE)/length(na.omit(middlechild.ITN$Slept_ITN)))
+se.middlechild
+mean.richerchild <- mean(richerchild.ITN$Slept_ITN)
+mean.richerchild
+se.richerchild <-sqrt(var(richerchild.ITN$Slept_ITN,na.rm=TRUE)/length(na.omit(richerchild.ITN$Slept_ITN)))
+se.richerchild
+mean.richestchild <- mean(richestchild.ITN$Slept_ITN)
+mean.richestchild
+se.richestchild <-sqrt(var(richestchild.ITN$Slept_ITN,na.rm=TRUE)/length(na.omit(richestchild.ITN$Slept_ITN)))
+se.richestchild
+
+mean(zam_child$Slept_ITN)
+sqrt(var(zam_child$Slept_ITN,na.rm=TRUE)/length(na.omit(zam_child$Slept_ITN)))
+```
+``` {r SRS edu4, warning = FALSE, message = FALSE}
+#2) Education level
+
+
+#Using subset approach (means and standard errors) for each category/value under the HH_edu variable
+Noeduchild.ITN <- subset(zam_child, subset=(Mother_education=="No education"))
+attach(Noeduchild.ITN)
+Primarychild.ITN <- subset(zam_child, subset=(Mother_education=="Primary"))
+attach(Primarychild.ITN)
+Secondarychild.ITN <- subset(zam_child, subset=(Mother_education=="Secondary"))
+attach(Secondarychild.ITN)
+Higherchild.ITN <- subset(zam_child, subset=(Mother_education=="Higher than"))
+attach(Higherchild.ITN)
+
+mean.nonechild <- mean(Noeduchild.ITN$Slept_ITN) #No education
+mean.nonechild
+se.nonechild <-sqrt(var(Noeduchild.ITN$Slept_ITN,na.rm=TRUE)/length(na.omit(Noeduchild.ITN$Slept_ITN)))
+se.nonechild
+mean.primarychild<- mean(Primarychild.ITN$Slept_ITN)#Primary
+mean.primarychild
+se.primarychild <-sqrt(var(Primarychild.ITN$Slept_ITN,na.rm=TRUE)/length(na.omit(Primarychild.ITN$Slept_ITN)))
+se.primarychild
+mean.secondarychild<- mean(Secondarychild.ITN$Slept_ITN)#Secondary
+mean.secondarychild
+se.secondarychild <-sqrt(var(Secondarychild.ITN$Slept_ITN,na.rm=TRUE)/length(na.omit(Secondarychild.ITN$Slept_ITN)))
+se.secondarychild
+mean.higherchild <- mean(Higherchild.ITN$Slept_ITN)#Higher than
+mean.higherchild
+se.higherchild <-sqrt(var(Higherchild.ITN$Slept_ITN,na.rm=TRUE)/length(na.omit(Higherchild.ITN$Slept_ITN)))
+se.higherchild
+
+
+```
+```{r SRS edu5, warning = FALSE, message = FALSE}
+zerochild.ITN <- subset(zam_child, subset=(Child_age=="0"))
+attach(zerochild.ITN)
+onechild.ITN <- subset(zam_child, subset=(Child_age=="1"))
+attach(onechild.ITN)
+twochild.ITN <- subset(zam_child, subset=(Child_age=="2"))
+attach(twochild.ITN)
+threechild.ITN <- subset(zam_child, subset=(Child_age=="3"))
+attach(threechild.ITN)
+fourchild.ITN <- subset(zam_child, subset=(Child_age=="4"))
+attach(fourchild.ITN)
+
+mean.zerochild <- mean(zerochild.ITN$Slept_ITN) 
+mean.zerochild
+se.zerochild <-sqrt(var(zerochild.ITN$Slept_ITN,na.rm=TRUE)/length(na.omit(zerochild.ITN$Slept_ITN)))
+se.zerochild
+mean.onechild<- mean(onechild.ITN$Slept_ITN)
+mean.onechild
+se.onechild <-sqrt(var(onechild.ITN$Slept_ITN,na.rm=TRUE)/length(na.omit(onechild.ITN$Slept_ITN)))
+se.onechild
+mean.twochild<- mean(twochild.ITN$Slept_ITN)
+mean.twochild
+se.twochild <-sqrt(var(twochild.ITN$Slept_ITN,na.rm=TRUE)/length(na.omit(twochild.ITN$Slept_ITN)))
+se.twochild
+mean.threechild <- mean(threechild.ITN$Slept_ITN)
+mean.threechild
+se.threechild <-sqrt(var(threechild.ITN$Slept_ITN,na.rm=TRUE)/length(na.omit(threechild.ITN$Slept_ITN)))
+se.threechild
+mean.fourchild <- mean(fourchild.ITN$Slept_ITN)
+mean.fourchild
+se.fourchild <-sqrt(var(fourchild.ITN$Slept_ITN,na.rm=TRUE)/length(na.omit(fourchild.ITN$Slept_ITN)))
+se.fourchild
+```
+## Step 3: Calculate proportions and standard errors of select indicators assuming SRS with weights
+
+We now want to calculate weighted  proportions assuming an SRS sampling strategy. we want to apply weights when calculating our standard errors. 
+
+To calculate proportions AND standard errors assuming SRS with weights, we can create a function where we tell R Studio how we want our proportions to be calculated given our sampling strategy.
+
+``` {r SRS weight}
+
+DHS_SRS_wtdhh<-svydesign(ids= ~1, weights=~pw,data=zam_hh, nest=TRUE) #inclusion of ids= ~1 indicates no clustering (remember we are still assuming SRS at this point)
+
+total.srswt.hh<-svymean(~HH_has_ITN, DHS_SRS_wtdhh)
+total.srswt.hh
+```
+
+We can then calculate proportions and weighted standard errors, given some criteria (Residence or education level,for example), in the same table (i.e. we don't have to individually calcluate each proportion and standard error as we did in Step 1). The "svyby" command is part of the svyr package, which was loaded at the beginning of the .rmd file. 
+
+``` {r SRS wtd prop}
+
+reshh.SRS <- svyby(~HH_has_ITN, ~HH_residence, DHS_SRS_wtdhh, svymean, na.rm=TRUE) #Residence
+reshh.SRS
+
+seshh.SRS<- svyby(~HH_has_ITN, ~HH_wealth_index, DHS_SRS_wtdhh, svymean, na.rm=TRUE)
+seshh.SRS
+
+eduhh.SRS<- svyby(~HH_has_ITN, ~HH_head_education, DHS_SRS_wtdhh, svymean, na.rm=TRUE)
+eduhh.SRS
+```
+```{r SRS weight2}
+DHS_SRS_wtdchild<-svydesign(ids= ~1, weights=~pw,data=zam_child, nest=TRUE) #inclusion of ids= ~1 indicates no clustering (remember we are still assuming SRS at this point)
+
+total.srswt.child<-svymean(~Slept_ITN, DHS_SRS_wtdchild)
+total.srswt.child
+```
+
+``` {r SRS wtd prop2}
+
+
+reschild.SRS <- svyby(~Slept_ITN, ~HH_residence, DHS_SRS_wtdchild, svymean, na.rm=TRUE) #Residence
+reschild.SRS
+
+seschild.SRS<- svyby(~Slept_ITN, ~HH_wealth_index, DHS_SRS_wtdchild, svymean, na.rm=TRUE)
+seschild.SRS
+
+educhild.SRS<- svyby(~Slept_ITN, ~Mother_education, DHS_SRS_wtdchild, svymean, na.rm=TRUE)
+educhild.SRS
+
+agechild.SRS <- svyby(~Slept_ITN, ~Child_age, DHS_SRS_wtdchild, svymean, na.rm=TRUE)
+agechild.SRS
+```
+
+## Step 4: Calculate proportions and standard errors of select indicators assuming 2-Stage Cluster sampling with weights 
+
+We now need to re-specify our survey design to reflect 2-Stage cluster sampling with weights. We will use the same syntax as when creating the SRS with weights survey design function, however will need to update our "ids" to correspond with our primary sampling unit, so that R Studio can see that our data is now clustered. 
+
+```{r Cluster weights}
+
+DHS_Clstr_wtdhh<-svydesign(ids= ~Primary_sampling_unit, weights=~pw,data=zam_hh, nest=TRUE)
+
+total.clstrwt.hh<-svymean(~HH_has_ITN, DHS_Clstr_wtdhh)
+total.clstrwt.hh
+```
+
+``` {r Cluster wtd prop}
+
+
+Reshh.Clstr <- svyby(~HH_has_ITN, ~HH_residence, DHS_Clstr_wtdhh, svymean, na.rm=TRUE) #Residence
+Reshh.Clstr
+
+Eduhh.Clstr<- svyby(~HH_has_ITN, ~HH_head_education, DHS_Clstr_wtdhh, svymean, na.rm=TRUE)
+Eduhh.Clstr
+
+seshh.Clstr<- svyby(~HH_has_ITN, ~HH_wealth_index, DHS_Clstr_wtdhh, svymean, na.rm=TRUE)
+seshh.Clstr
+```
+
+```{r Cluster weights2}
+
+DHS_Clstr_wtdchild<-svydesign(ids= ~Primary_sampling_unit, weights=~pw,data=zam_child, nest=TRUE)
+
+total.clstrwt.child<-svymean(~Slept_ITN, DHS_Clstr_wtdchild)
+total.clstrwt.child
+```
+
+``` {r Cluster wtd prop2}
+
+
+Reschild.Clstr <- svyby(~Slept_ITN, ~HH_residence, DHS_Clstr_wtdchild, svymean, na.rm=TRUE) 
+Reschild.Clstr
+
+Educhild.Clstr<- svyby(~Slept_ITN, ~Mother_education, DHS_Clstr_wtdchild, svymean, na.rm=TRUE)
+Educhild.Clstr
+
+seschild.Clstr<- svyby(~Slept_ITN, ~HH_wealth_index, DHS_Clstr_wtdchild, svymean, na.rm=TRUE)
+seschild.Clstr
+
+agechild.Clstr<- svyby(~Slept_ITN, ~Child_age, DHS_Clstr_wtdchild, svymean, na.rm=TRUE)
+agechild.Clstr
+```
+
+## Step 5: Calculate proportions and standard errors of select indicators assuming 2-Stage Cluster sampling with weights and stratification
+
+Here we need to create another function to implement/apply our survey design (2-Stage Cluster sampling with stratification) when calculating our proportions and standard errors.
+
+```{r CWS}
+
+DHS_Clstr_strathh <-svydesign(ids= ~Primary_sampling_unit, strata= ~Sample_stratum_number, weights=~pw,data=zam_hh, nest=TRUE)
+
+total.clstrwtstrat.hh<-svymean(~HH_has_ITN, DHS_Clstr_strathh)
+total.clstrwtstrat.hh
+
+#note here that we have not specified 2-stage cluster sampling. As multistage sampling has no effect when fpc is not provided (for example with this data set), we do not need to specific 2-stage cluster sampling here when defining our "ids".
+```
+
+
+```{r CWS props}
+
+Reshh.Strat <- svyby(~HH_has_ITN, ~HH_residence, DHS_Clstr_strathh, svymean, na.rm=TRUE) #Residence
+Reshh.Strat
+
+Eduhh.Strat <- svyby(~HH_has_ITN, ~HH_head_education, DHS_Clstr_strathh, svymean, na.rm=TRUE) 
+Eduhh.Strat
+
+Seshh.Strat <- svyby(~HH_has_ITN, ~HH_wealth_index, DHS_Clstr_strathh, svymean, na.rm=TRUE) 
+Seshh.Strat
+
+```
+```{r CWS2}
+
+DHS_Clstr_stratchild <-svydesign(ids= ~Primary_sampling_unit, strata= ~Sample_stratum_number, weights=~pw,data=zam_child, nest=TRUE)
+
+DHS_Clstr_stratchildtotal<-svymean(~Slept_ITN, DHS_Clstr_stratchild)
+DHS_Clstr_stratchildtotal
+
+
+#note here that we have not specified 2-stage cluster sampling. As multistage sampling has no effect when fpc is not provided (for example with this data set), we do not need to specific 2-stage cluster sampling here when defining our "ids".
+```
+
+
+```{r CWS props2}
+
+Reschild.Strat <- svyby(~Slept_ITN, ~HH_residence, DHS_Clstr_stratchild, svymean, na.rm=TRUE) #Residence
+Reschild.Strat
+
+Educhild.Strat <- svyby(~Slept_ITN, ~Mother_education, DHS_Clstr_stratchild, svymean, na.rm=TRUE) 
+Educhild.Strat
+
+Seschild.Strat <- svyby(~Slept_ITN, ~HH_wealth_index, DHS_Clstr_stratchild, svymean, na.rm=TRUE) 
+Seschild.Strat
+
+agechild.Strat <- svyby(~Slept_ITN, ~Child_age, DHS_Clstr_stratchild, svymean, na.rm=TRUE) 
+agechild.Strat
+```
