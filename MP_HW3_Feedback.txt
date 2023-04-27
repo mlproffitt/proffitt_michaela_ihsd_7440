@@ -1,0 +1,7 @@
+Michaela Proffitt HW3
+
+Feedback:
+- really nice job! Just be careful when transferring your figures over form R to your table, there were a few mistakes
+- please use the code I provided in line 134 to answer question 1e (if you want to get credit for it)
+
+Grade 32/35

@@ -59,8 +59,6 @@ sessionInfo()
 
 ```{r load, tidy = TRUE}
 
-
-
 zam_child <- read.csv(file = "C:\\Users\\Mikki\\OneDrive - Tulane University\\Documents\\sampling\\GitHub\\IHSD_7440_HH_Sampling\\2007_Zambia_Child_2023.csv")
 zam_hh <- read.csv(file = "C:\\Users\\Mikki\\OneDrive - Tulane University\\Documents\\sampling\\GitHub\\IHSD_7440_HH_Sampling\\2007_Zambia_HH_2023.csv")
 
@@ -131,6 +129,9 @@ length(unique(zam_child$Primary_sampling_unit))
 
 ```{r domains2}
 length(unique(zam_hh$Sample_domain)) 
+
+#code for getting your number of strata is below:
+length(unique(zam_hh$Sample_stratum_number)) 
 
 range=as.data.frame(table(zam_hh$Primary_sampling_unit))
 min(range$Freq)
@@ -216,23 +217,27 @@ attach(richer.ITN)
 richest.ITN <- subset(zam_hh, subset=(HH_wealth_index=="Highes"))
 attach(richest.ITN)
 
-mean.poorest <- mean(poorest.ITN$HH_has_ITN) #No education
-mean.none
+mean.poorest <- mean(poorest.ITN$HH_has_ITN) #poorest
+mean.none #careful here- you set it up for SES but ran the mean for no education
 se.poorest <-sqrt(var(poorest.ITN$HH_has_ITN,na.rm=TRUE)/length(na.omit(poorest.ITN$HH_has_ITN)))
 se.poorest
-mean.poorer<- mean(poorer.ITN$HH_has_ITN)#Primary
+
+mean.poorer<- mean(poorer.ITN$HH_has_ITN) #poorer
 mean.poorer
 se.poorer <-sqrt(var(poorer.ITN$HH_has_ITN,na.rm=TRUE)/length(na.omit(poorer.ITN$HH_has_ITN)))
 se.poorer
-mean.middle<- mean(middle.ITN$HH_has_ITN)#Secondary
+
+mean.middle<- mean(middle.ITN$HH_has_ITN)#middle
 mean.middle
 se.middle <-sqrt(var(middle.ITN$HH_has_ITN,na.rm=TRUE)/length(na.omit(middle.ITN$HH_has_ITN)))
 se.middle
-mean.richer <- mean(richer.ITN$HH_has_ITN)#Higher than
+
+mean.richer <- mean(richer.ITN$HH_has_ITN)#fourth
 mean.richer
 se.richer <-sqrt(var(richer.ITN$HH_has_ITN,na.rm=TRUE)/length(na.omit(richer.ITN$HH_has_ITN)))
 se.richer
-mean.richest <- mean(richest.ITN$HH_has_ITN)#Higher than
+
+mean.richest <- mean(richest.ITN$HH_has_ITN) #highest
 mean.richest
 se.richest <-sqrt(var(richest.ITN$HH_has_ITN,na.rm=TRUE)/length(na.omit(richest.ITN$HH_has_ITN)))
 se.richest
@@ -354,10 +359,12 @@ mean.twochild<- mean(twochild.ITN$Slept_ITN)
 mean.twochild
 se.twochild <-sqrt(var(twochild.ITN$Slept_ITN,na.rm=TRUE)/length(na.omit(twochild.ITN$Slept_ITN)))
 se.twochild
+
 mean.threechild <- mean(threechild.ITN$Slept_ITN)
 mean.threechild
 se.threechild <-sqrt(var(threechild.ITN$Slept_ITN,na.rm=TRUE)/length(na.omit(threechild.ITN$Slept_ITN)))
 se.threechild
+
 mean.fourchild <- mean(fourchild.ITN$Slept_ITN)
 mean.fourchild
 se.fourchild <-sqrt(var(fourchild.ITN$Slept_ITN,na.rm=TRUE)/length(na.omit(fourchild.ITN$Slept_ITN)))
